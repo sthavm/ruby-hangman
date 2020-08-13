@@ -36,7 +36,11 @@ class Game
 
   He is doomed unless you can guess the word he was trying to steal.
   His fate now rests in your hands. Godspeed!
-      
+
+
+  At any point, instead of a single character guess you can type 'save'
+  to save your game and quit.
+  
     HEREDOC
   end
 
@@ -49,7 +53,11 @@ class Game
         initialize_new_game
         break
       when 2
-        load_saved_game
+        unless load_saved_game
+          puts "\n"
+          puts "There are no saved games. You'll have to start a new one."
+          initialize_new_game
+        end
         break
       else
         puts 'Invalid input'
@@ -65,6 +73,72 @@ class Game
     @word_guessed = false
     @incorrect_guesses = []
     @guessed_already = []
+  end
+
+  def load_saved_game
+    saved_games = get_saved_games
+    if saved_games == []
+      false
+    else
+      puts 'Type the index of the save to load it'
+      puts "\n"
+      saved_games.each_with_index do |game, index|
+        puts "#{index + 1}: #{game['word_progress'].join(' ')}, #{game['num_incorrect_guesses']}/6 incorrect guesses"
+        puts "\n"
+      end
+      loop do
+        print 'Pick save: '
+        answer = gets.chomp.to_i
+        case answer
+        when 0
+          puts 'Invalid input, try again.'
+        else
+          if !saved_games[answer - 1].nil?
+            chosen_game = saved_games[answer - 1]
+            @word = chosen_game['word']
+            @word_split = chosen_game['word_split']
+            @word_progress = chosen_game['word_progress']
+            @num_incorrect_guesses = chosen_game['num_incorrect_guesses']
+            @word_guessed = chosen_game['word_guessed']
+            @incorrect_guesses = chosen_game['incorrect_guesses']
+            @guessed_already = chosen_game['guessed_already']
+            return true
+          else
+            puts 'Invalid input, try again.'
+          end
+        end
+      end
+    end
+  end
+
+  def save_game
+    Dir.mkdir('saved_games') unless Dir.exist?('saved_games')
+    saved_games = get_saved_games
+
+    this_game = {
+      'word' => @word,
+      'word_split' => @word_split,
+      'word_progress' => @word_progress,
+      'num_incorrect_guesses' => @num_incorrect_guesses,
+      'word_guessed' => @word_guessed,
+      'incorrect_guesses' => @incorrect_guesses,
+      'guessed_already' => @guessed_already
+    }
+
+    saved_games.push(this_game)
+    serialized = Marshal.dump(saved_games)
+    File.open('saved_games/saved_games.txt', 'w') do |file|
+      file.puts serialized
+    end
+  end
+
+  def get_saved_games
+    if File.exist?('saved_games/saved_games.txt')
+      saved_game_data = File.read('saved_games/saved_games.txt')
+      Marshal.load(saved_game_data)
+    else
+      []
+    end
   end
 
   def game_loop
@@ -99,6 +173,9 @@ class Game
     print 'Type your guess (a single lowercase character): '
     loop do
       guess = gets.chomp
+      if guess == 'save'
+        return guess
+      end
       if guess.length == 1
         if guess.ord >= 97 && guess.ord <= 122
           if @guessed_already.include?(guess)
@@ -116,6 +193,12 @@ class Game
   end
 
   def evaluate_guess(guess)
+    if guess == 'save'
+      save_game
+      puts 'Game saved. Goodbye!'
+      puts "\n"
+      exit
+    end
     if @word_split.include?(guess)
       @word_split.each_with_index do |char, idx|
         if char == guess
